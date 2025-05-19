@@ -1,0 +1,184 @@
+PROGRAM TCP_Client
+
+------------------------------------ TCP_Client Plug-In ------------------------------------
+-- Author: Niccolo' Quadrani
+-- Date: 24/04/2025
+-- Version: 2.2.4
+------------------------------------ TCP_Client Plug-In ------------------------------------
+
+
+------------------------------------ Import ------------------------------------
+
+%RWACCESS
+%STACKSIZE = 4096
+%NOLOCKGROUP
+%NOBUSYLAMP
+%NOPAUSE = ERROR + COMMAND + TPENABLE
+%ENVIRONMENT uif
+%ENVIRONMENT sysdef
+%ENVIRONMENT memo
+%ENVIRONMENT kclop
+%ENVIRONMENT bynam
+%ENVIRONMENT fdev
+%ENVIRONMENT flbt
+%ENVIRONMENT regope
+%ENVIRONMENT strng
+%INCLUDE klevccdf
+%INCLUDE klevkeys
+%INCLUDE klevkmsk
+
+------------------------------------ Variables Declaration ------------------------------------
+VAR
+    -- File variables (Files are used as sockets to communicate with an external interface)
+    f_tcp_socket:                   FILE
+
+    -- Integers variables
+    i_exe_flag:                     INTEGER
+    i_status:                       INTEGER
+    i_command:                      INTEGER
+    i_bytes_to_read:                INTEGER
+    i_error:                        INTEGER
+    i_stop_index:                   INTEGER
+    i_start_index:                  INTEGER
+    i_refactor_value:               INTEGER
+    i_lenght:                       INTEGER
+    i_hopper_time:                  INTEGER
+    i_hopper_signal:                INTEGER
+    i_pattern:                      INTEGER
+    i_stop_running:                 INTEGER
+
+    -- {Type_in/out_Name} (ir = integer register, sr = string register, pr = position register // i = input, o = output, io = input/output)
+
+    -- Integer Registers
+    ir_i_command_register:          INTEGER
+    ir_o_patternID_register:        INTEGER
+    ir_io_execute_register:         INTEGER
+
+    -- String Registers 
+    sr_o_error_register:            INTEGER
+    sr_o_response_register:         INTEGER
+    sr_io_recipeName_register:      INTEGER
+    sr_i_custom_command:            INTEGER
+
+    -- Position Registers
+    pr_o_position_register:         INTEGER
+
+    -- Real variables
+    r_value:                        REAL
+    r_x_position:                   REAL
+    r_y_position:                   REAL
+    r_rz_position:                  REAL
+
+    -- Position variables
+    p_tcp_pos:                      XYZWPR
+
+    -- String variables
+    s_tcp_command:                  STRING [32]
+    s_received_string:              STRING [64]
+    s_reset:                        STRING [2]
+    s_error_string:                 STRING [128]
+    s_recipe:                       STRING [32]
+    s_custom_command:               STRING [32]
+    s_pattern:                      STRING [64]
+    s_x_position:                   STRING [16]
+    s_y_position:                   STRING [16]
+    s_rz_position:                  STRING [16]
+    s_config:                       STRING [16]
+    s_hopper_signal_number:         STRING [8]
+    s_hopper_time:                  STRING [8]
+
+    -- Boolean variables
+    b_stop:                         BOOLEAN
+    b_real_flag:                    BOOLEAN
+    b_command_done:                 BOOLEAN
+    b_no_erors:                     BOOLEAN
+
+
+------------------------------------ MAIN ------------------------------------
+BEGIN
+    ------------ Initial File variables set-up ------------
+
+	SET_FILE_ATR(f_tcp_socket,ATR_IA) -- Setting the File Socket to "ATR_IA" (Interactively write on the file)
+
+    -- Initial Integer variables set-up
+    i_exe_flag = 0
+    i_error = 0
+    i_pattern = 0
+
+    -- Initial String variables set-up
+    s_tcp_command = ' '
+    s_reset = ' '
+    s_config = 'Fut000'
+    s_custom_command = ' '
+
+    -- Setting up the integer registers
+    ir_i_command_register = 1
+    ir_o_patternID_register = 2
+    ir_io_execute_register = 3
+    
+    -- Setting up the boolean registers 
+    b_command_done = FALSE
+
+    -- Setting up the comment of the registers
+    SET_REG_CMT (ir_i_command_register,         'FV Command', i_status)
+    SET_REG_CMT (ir_o_patternID_register,       'FV Pattern ID', i_status)
+    SET_REG_CMT (ir_io_execute_register,        'FV Exe_Flag', i_status)
+
+    -- Setting up the value of the registers
+    SET_INT_REG (ir_i_command_register,       0, i_status)
+    SET_INT_REG (ir_o_patternID_register,     0, i_status)
+    SET_INT_REG (ir_io_execute_register,      0, i_status)
+
+    -- Setting up the string registers
+    sr_o_error_register = 1
+    sr_o_response_register = 2
+    sr_io_recipeName_register = 3
+    sr_i_custom_command = 4
+    SET_SREG_CMT(sr_o_error_register,           'Error', i_status)
+    SET_SREG_CMT(sr_o_response_register,        'FV Response', i_status)
+    SET_SREG_CMT(sr_io_recipeName_register,     'Recipe Name', i_status)
+    SET_SREG_CMT(sr_i_custom_command,           'Custom Command', i_status)
+    SET_STR_REG (sr_o_error_register,           ' ', i_status)
+    SET_STR_REG (sr_o_response_register,        ' ', i_status)
+    SET_STR_REG (sr_io_recipeName_register,     ' ', i_status)
+    SET_STR_REG (sr_i_custom_command,           ' ', i_status)
+
+    -- Setting up the position register
+    pr_o_position_register = 1
+    CLR_POS_REG(pr_o_position_register, 0, i_status)
+	SET_PREG_CMT (pr_o_position_register, 'FV Position', i_status)
+   
+    -- Connecting to the client before doing any client related operation
+    MSG_CONNECT('C3:',i_status)
+    WHILE i_status <> 0 DO
+        CLR_IO_STAT(f_tcp_socket) -- Clearing the IO status from older runs
+        MSG_DISCO('C3:',i_status) -- Clearing the socket connection
+        DELAY(100)
+        MSG_CONNECT('C3:',i_status)
+    ENDWHILE
+    
+    OPEN FILE f_tcp_socket ('rw','C3:') -- Opening the file using write mode on client 3 
+    i_status = IO_STATUS(f_tcp_socket) -- Checking the current IO i_status
+
+    WHILE i_status <> 0 DO -- Looping until the socket is open
+        CLOSE FILE f_tcp_socket -- Closing the file to reset the connection
+        DELAY(50) -- Waiting for the connection to be established
+        OPEN FILE f_tcp_socket ('rw','C3:') -- Opening the file using write mode on client 3
+        DELAY(25)
+        i_status = IO_STATUS(f_tcp_socket) -- Checking the current IO i_status
+    ENDWHILE
+
+    -- Cleaning the file buffer
+    BYTES_AHEAD(f_tcp_socket,i_bytes_to_read,i_status) -- Reading if there are any remained data 
+    IF i_bytes_to_read >= 1 THEN
+        READ f_tcp_socket (s_received_string::i_bytes_to_read)
+    ENDIF
+    
+    ------------ Main Cicle ------------
+
+    WHILE TRUE DO 
+       
+
+    ENDWHILE
+
+END TCP_Client
