@@ -29,15 +29,22 @@ PROGRAM TCP_Client
 
 ------------------------------------ Variables Declaration ------------------------------------
 VAR
+    -- File variables (Used as a socket)
+    f_socket                        FILE
+
     -- Integers Variables
     i_debug:                        INTEGER
     i_status:                       INTEGER
+    i_bytes_to_read:                INTEGER
 
     -- Real Variables
     r_value:                        REAL
 
     -- Bolean Variables
     b_real_flag:                    BOOLEAN
+
+    -- String variables
+    s_received_string:              STRING [64]
 
     -- Integer Registers
     ir_i_debug_register:            INTEGER
@@ -71,4 +78,30 @@ BEGIN
     SET_INT_REG (ir_i_debug_register, 0, i_status)
 
     debug_routine("Example")
+
+     -- Connecting to the client before doing any client related operation
+    MSG_CONNECT('C3:',i_status)
+    WHILE i_status <> 0 DO
+        CLR_IO_STAT(f_socket) -- Clearing the IO status from older runs
+        MSG_DISCO('C3:',i_status) -- Clearing the socket connection
+        DELAY(100)
+        MSG_CONNECT('C3:',i_status)
+    ENDWHILE
+    
+    OPEN FILE f_socket ('rw','C3:') -- Opening the file using write mode on client 3 
+    i_status = IO_STATUS(f_socket) -- Checking the current IO i_status
+
+    WHILE i_status <> 0 DO -- Looping until the socket is open
+        CLOSE FILE f_socket -- Closing the file to reset the connection
+        DELAY(50) -- Waiting for the connection to be established
+        OPEN FILE f_socket ('rw','C3:') -- Opening the file using write mode on client 3
+        DELAY(25)
+        i_status = IO_STATUS(f_socket) -- Checking the current IO i_status
+    ENDWHILE
+
+    -- Cleaning the file buffer
+    BYTES_AHEAD(f_socket,i_bytes_to_read,i_status) -- Reading if there are any remained data 
+    IF i_bytes_to_read >= 1 THEN
+        READ f_socket (s_received_string::i_bytes_to_read)
+    ENDIF
 END TCP_Client
