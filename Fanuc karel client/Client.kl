@@ -1,0 +1,74 @@
+PROGRAM TCP_Client
+
+------------------------------------ TCP_Client Plug-In ------------------------------------
+-- Author: Niccolo' Quadrani
+-- Date: 24/04/2025
+-- Version: 2.2.4
+------------------------------------ TCP_Client Plug-In ------------------------------------
+
+
+------------------------------------ Import ------------------------------------
+
+%RWACCESS
+%STACKSIZE = 4096
+%NOLOCKGROUP
+%NOBUSYLAMP
+%NOPAUSE = ERROR + COMMAND + TPENABLE
+%ENVIRONMENT uif
+%ENVIRONMENT sysdef
+%ENVIRONMENT memo
+%ENVIRONMENT kclop
+%ENVIRONMENT bynam
+%ENVIRONMENT fdev
+%ENVIRONMENT flbt
+%ENVIRONMENT regope
+%ENVIRONMENT strng
+%INCLUDE klevccdf
+%INCLUDE klevkeys
+%INCLUDE klevkmsk
+
+------------------------------------ Variables Declaration ------------------------------------
+VAR
+    -- Integers Variables
+    i_debug:                        INTEGER
+    i_status:                       INTEGER
+
+    -- Real Variables
+    r_value:                        REAL
+
+    -- Bolean Variables
+    b_real_flag:                    BOOLEAN
+
+    -- Integer Registers
+    ir_i_debug_register:            INTEGER
+
+------------------------------------ Debug Routine ------------------------------------
+
+ROUTINE debug_routine(msg:STRING)
+VAR
+    -- Used to format the debugs
+    formatted_msg : STRING[64]
+
+BEGIN
+    -- Getting the register value
+    GET_REG(ir_i_debug_register, b_real_flag, i_debug, r_value, i_status)
+
+    IF i_status = 0 THEN -- Error check
+        IF i_debug <> 0 THEN
+            formatted_msg = "DEBUG: " + msg
+            WRITE (formatted_msg, CR) -- Debugging on the CR
+        ENDIF
+    ELSE 
+        WRITE ("ERROR: Cannot execute GET_REG", CR) -- Printing the error in the CR
+    ENDIF
+
+END debug_routine
+
+------------------------------------ MAIN ------------------------------------
+BEGIN
+    ir_i_debug_register = 1
+    SET_REG_CMT (ir_i_debug_register, 'FV Command', i_status)
+    SET_INT_REG (ir_i_debug_register, 0, i_status)
+
+    debug_routine("Example")
+END TCP_Client
