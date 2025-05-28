@@ -30,7 +30,7 @@ PROGRAM TCP_Client
 ------------------------------------ Variables Declaration ------------------------------------
 VAR
     -- File variables (Used as a socket)
-    f_socket                        FILE
+    f_socket:                        FILE
 
     -- Integers Variables
     i_debug:                        INTEGER
@@ -51,7 +51,7 @@ VAR
 
 ------------------------------------ Debug Routine ------------------------------------
 
-ROUTINE debug_routine(msg:STRING)
+ROUTINE debug(msg:STRING)
 VAR
     -- Used to format the debugs
     formatted_msg : STRING[64]
@@ -62,22 +62,20 @@ BEGIN
 
     IF i_status = 0 THEN -- Error check
         IF i_debug <> 0 THEN
-            formatted_msg = "DEBUG: " + msg
+            formatted_msg = 'DEBUG: ' + msg
             WRITE (formatted_msg, CR) -- Debugging on the CR
         ENDIF
     ELSE 
-        WRITE ("ERROR: Cannot execute GET_REG", CR) -- Printing the error in the CR
+        WRITE ('ERROR: Cannot execute GET_REG', CR) -- Printing the error in the CR
     ENDIF
 
-END debug_routine
+END debug
 
 ------------------------------------ MAIN ------------------------------------
 BEGIN
     ir_i_debug_register = 1
-    SET_REG_CMT (ir_i_debug_register, 'FV Command', i_status)
+    SET_REG_CMT (ir_i_debug_register, 'Command', i_status)
     SET_INT_REG (ir_i_debug_register, 0, i_status)
-
-    debug_routine("Example")
 
      -- Connecting to the client before doing any client related operation
     MSG_CONNECT('C3:',i_status)
@@ -104,4 +102,7 @@ BEGIN
     IF i_bytes_to_read >= 1 THEN
         READ f_socket (s_received_string::i_bytes_to_read)
     ENDIF
+    
+    debug(s_received_string)
+    
 END TCP_Client
