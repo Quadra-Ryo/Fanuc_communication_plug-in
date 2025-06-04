@@ -34,6 +34,9 @@ VAR
 
     -- Integers Variables
     i_debug:                        INTEGER
+    i_command:                      INTEGER
+    i_exe_flag:                     INTEGER
+    i_object_number:                INTEGER
     i_status:                       INTEGER
     i_bytes_to_read:                INTEGER
 
@@ -44,10 +47,26 @@ VAR
     b_real_flag:                    BOOLEAN
 
     -- String variables
+    s_custom_command:               STRING [64]
     s_received_string:              STRING [64]
+    s_recipe:                       STRING [32]
+    s_response:                     STRING [32]
+    s_error:                        STRING [32]
 
     -- Integer Registers
     ir_i_debug_register:            INTEGER
+    ir_i_command_register:          INTEGER
+    ir_io_exe_register:             INTEGER
+    ir_o_object_register:           INTEGER
+
+    -- String Registers
+    sr_i_custom_command:            INTEGER
+    sr_io_recipe:                   INTEGER
+    sr_o_response:                  INTEGER
+    sr_o_error:                     INTEGER
+
+    -- Position Registers
+    pr_o_object_position:           INTEGER
 
 ------------------------------------ Debug Routine ------------------------------------
 
@@ -71,28 +90,78 @@ BEGIN
 
 END debug
 
+ROUTINE registers_setup()
+BEGIN
+    ------------------------------------ Registers setting  ------------------------------------
+
+    -- Setting-up the INTEGER registers
+    ir_i_debug_register = 1
+    ir_i_command_register = 2
+    ir_io_exe_register = 3
+    ir_o_object_register = 4
+
+    -- Commenting the registers
+    SET_REG_CMT (ir_i_debug_register,       'Activate debug', i_status)
+    SET_REG_CMT (ir_i_command_register,     'Command', i_status)
+    SET_REG_CMT (ir_io_exe_register,        'Execute', i_status)
+    SET_REG_CMT (ir_o_object_register,      'Object number', i_status)
+    
+    -- Resetting the values of the registers
+    SET_INT_REG (ir_i_debug_register,    0, i_status)
+    SET_INT_REG (ir_i_command_register,  0, i_status)
+    SET_INT_REG (ir_io_exe_register,    -1, i_status) -- Set to -1 to give a feedback on the connection, set to 0 after the connection
+    SET_INT_REG (ir_o_object_register,   0, i_status)
+
+    -- Setting-up the STRING registers
+    sr_i_custom_command = 1
+    sr_io_recipe = 2
+    sr_o_response = 3
+    sr_o_error = 4
+
+    -- Commenting the registers
+    SET_REG_CMT (sr_i_custom_command,       'Custom command', i_status)
+    SET_REG_CMT (sr_io_recipe,              'Recipe name', i_status)
+    SET_REG_CMT (sr_o_response,             'Vision response', i_status)
+    SET_REG_CMT (sr_o_error,                'Vision error', i_status)
+
+    -- Resetting the values of the registers
+    SET_INT_REG (sr_i_custom_command,   '', i_status)
+    SET_INT_REG (sr_io_recipe,          '', i_status)
+    SET_INT_REG (sr_o_response,         '', i_status)
+    SET_INT_REG (sr_o_error,            '', i_status)
+
+    -- Setting-up the POSITION registers
+    pr_o_object_position = 1
+    
+    -- Commenting the registers
+    SET_REG_CMT (pr_o_object_position, 'Vision coordinates', i_status)
+
+    -- Resetting the values of the registers
+    SET_INT_REG (pr_o_object_position, 0, i_status)
+
+END registers_setup
+
 ------------------------------------ MAIN ------------------------------------
 BEGIN
-    ir_i_debug_register = 1
-    SET_REG_CMT (ir_i_debug_register, 'Command', i_status)
-    SET_INT_REG (ir_i_debug_register, 0, i_status)
+    registers_setup()
+    debug('Registers setted-up')
 
-     -- Connecting to the client before doing any client related operation
-    MSG_CONNECT('C3:',i_status)
+    -- Connecting to the client before doing any client related operation
+    MSG_CONNECT('C1:',i_status)
     WHILE i_status <> 0 DO
         CLR_IO_STAT(f_socket) -- Clearing the IO status from older runs
-        MSG_DISCO('C3:',i_status) -- Clearing the socket connection
+        MSG_DISCO('C1:',i_status) -- Clearing the socket connection
         DELAY(100)
-        MSG_CONNECT('C3:',i_status)
+        MSG_CONNECT('C1:',i_status)
     ENDWHILE
     
-    OPEN FILE f_socket ('rw','C3:') -- Opening the file using write mode on client 3 
+    OPEN FILE f_socket ('rw','C1:') -- Opening the file using write mode on client 3 
     i_status = IO_STATUS(f_socket) -- Checking the current IO i_status
 
-    WHILE i_status <> 0 DO -- Looping until the socket is open
+    WHILE i_status <> 0 DO -- Looping until the socket file is open
         CLOSE FILE f_socket -- Closing the file to reset the connection
         DELAY(50) -- Waiting for the connection to be established
-        OPEN FILE f_socket ('rw','C3:') -- Opening the file using write mode on client 3
+        OPEN FILE f_socket ('rw','C1:') -- Opening the file using write mode on client 3
         DELAY(25)
         i_status = IO_STATUS(f_socket) -- Checking the current IO i_status
     ENDWHILE
@@ -102,7 +171,6 @@ BEGIN
     IF i_bytes_to_read >= 1 THEN
         READ f_socket (s_received_string::i_bytes_to_read)
     ENDIF
-    
-    debug(s_received_string)
+    SET_INT_REG (ir_io_exe_register, 0, i_status) -- Connection ok feed back
     
 END TCP_Client

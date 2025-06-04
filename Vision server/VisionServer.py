@@ -32,11 +32,11 @@ def error_log(msg): # Error handling
 def locate(): # Randomizing the values of an object to simulate a vision system
     vision_state = state()
     if vision_state[1] > 0:
-        n = random.randint(1, 4)
+        n = random.randint(1, 3)
         x = round(random.uniform(1, 100), 2)
         y = round(random.uniform(1, 100), 2)
         rz = round(random.uniform(1, 100), 2)
-        message = (f"Object_{n};{x};{y};{rz}", 1)
+        message = (f"Object_{n};{x};{y};{rz};", 1)
         debug(message[0])
     else:
         message = ("#Error : Camera ran into an error!", -2)
@@ -45,7 +45,7 @@ def locate(): # Randomizing the values of an object to simulate a vision system
     return message
 
 def state(): # Randomizing the state of the camera
-    n = random.randint(1, 2)
+    n = random.randint(1, 50)
     if n == 1:
         message = ("#Error: Camera is not working", -2)
         error_log("Camera is not working")
