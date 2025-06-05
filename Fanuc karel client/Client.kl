@@ -2,8 +2,8 @@ PROGRAM TCP_Client
 
 ------------------------------------ TCP_Client Plug-In ------------------------------------
 -- Author: Niccolo' Quadrani
--- Date: 24/04/2025
--- Version: 2.2.4
+-- Date: 6/05/2025
+-- Version: 1.0.0
 ------------------------------------ TCP_Client Plug-In ------------------------------------
 
 
@@ -87,13 +87,12 @@ BEGIN
     ELSE 
         WRITE ('ERROR: Cannot execute GET_REG', CR) -- Printing the error in the CR
     ENDIF
-
 END debug
 
-ROUTINE registers_setup()
-BEGIN
-    ------------------------------------ Registers setting  ------------------------------------
+------------------------------------ Registers Set-Up ------------------------------------
 
+ROUTINE registers_setup(status:INTEGER)
+BEGIN
     -- Setting-up the INTEGER registers
     ir_i_debug_register = 1
     ir_i_command_register = 2
@@ -119,49 +118,45 @@ BEGIN
     sr_o_error = 4
 
     -- Commenting the registers
-    SET_REG_CMT (sr_i_custom_command,       'Custom command', i_status)
-    SET_REG_CMT (sr_io_recipe,              'Recipe name', i_status)
-    SET_REG_CMT (sr_o_response,             'Vision response', i_status)
-    SET_REG_CMT (sr_o_error,                'Vision error', i_status)
+    SET_SREG_CMT (sr_i_custom_command,       'Custom command', i_status)
+    SET_SREG_CMT (sr_io_recipe,              'Recipe name', i_status)
+    SET_SREG_CMT (sr_o_response,             'Vision response', i_status)
+    SET_SREG_CMT (sr_o_error,                'Vision error', i_status)
 
     -- Resetting the values of the registers
-    SET_INT_REG (sr_i_custom_command,   '', i_status)
-    SET_INT_REG (sr_io_recipe,          '', i_status)
-    SET_INT_REG (sr_o_response,         '', i_status)
-    SET_INT_REG (sr_o_error,            '', i_status)
+    SET_STR_REG (sr_i_custom_command,   '', i_status)
+    SET_STR_REG (sr_io_recipe,          '', i_status)
+    SET_STR_REG (sr_o_response,         '', i_status)
+    SET_STR_REG (sr_o_error,            '', i_status)
 
     -- Setting-up the POSITION registers
     pr_o_object_position = 1
     
     -- Commenting the registers
-    SET_REG_CMT (pr_o_object_position, 'Vision coordinates', i_status)
-
-    -- Resetting the values of the registers
-    SET_INT_REG (pr_o_object_position, 0, i_status)
-
+    SET_PREG_CMT (pr_o_object_position, 'Vision coordinates', i_status)
 END registers_setup
 
 ------------------------------------ MAIN ------------------------------------
 BEGIN
-    registers_setup()
+    registers_setup(i_status)
     debug('Registers setted-up')
 
     -- Connecting to the client before doing any client related operation
-    MSG_CONNECT('C1:',i_status)
+    MSG_CONNECT('C3:',i_status)
     WHILE i_status <> 0 DO
         CLR_IO_STAT(f_socket) -- Clearing the IO status from older runs
-        MSG_DISCO('C1:',i_status) -- Clearing the socket connection
+        MSG_DISCO('C3:',i_status) -- Clearing the socket connection
         DELAY(100)
-        MSG_CONNECT('C1:',i_status)
+        MSG_CONNECT('C3:',i_status)
     ENDWHILE
     
-    OPEN FILE f_socket ('rw','C1:') -- Opening the file using write mode on client 3 
+    OPEN FILE f_socket ('rw','C3:') -- Opening the file using write mode on client 3 
     i_status = IO_STATUS(f_socket) -- Checking the current IO i_status
 
     WHILE i_status <> 0 DO -- Looping until the socket file is open
         CLOSE FILE f_socket -- Closing the file to reset the connection
         DELAY(50) -- Waiting for the connection to be established
-        OPEN FILE f_socket ('rw','C1:') -- Opening the file using write mode on client 3
+        OPEN FILE f_socket ('rw','C3:') -- Opening the file using write mode on client 3
         DELAY(25)
         i_status = IO_STATUS(f_socket) -- Checking the current IO i_status
     ENDWHILE
