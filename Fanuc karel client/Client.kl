@@ -47,6 +47,7 @@ VAR
     b_real_flag:                    BOOLEAN
 
     -- String variables
+    s_send_command:                 STRING [64]
     s_custom_command:               STRING [64]
     s_received_string:              STRING [64]
     s_recipe:                       STRING [32]
@@ -69,8 +70,7 @@ VAR
     pr_o_object_position:           INTEGER
 
 ------------------------------------ Debug Routine ------------------------------------
-
-ROUTINE debug(msg:STRING)
+ROUTINE debug(s_msg:STRING)
 VAR
     -- Used to format the debugs
     formatted_msg : STRING[64]
@@ -81,7 +81,7 @@ BEGIN
 
     IF i_status = 0 THEN -- Error check
         IF i_debug <> 0 THEN
-            formatted_msg = 'DEBUG: ' + msg
+            formatted_msg = 'DEBUG: ' + s_msg
             WRITE (formatted_msg, CR) -- Debugging on the CR
         ENDIF
     ELSE 
@@ -90,8 +90,7 @@ BEGIN
 END debug
 
 ------------------------------------ Registers Set-Up ------------------------------------
-
-ROUTINE registers_setup(status:INTEGER)
+ROUTINE registers_setup(s_status:INTEGER)
 BEGIN
     -- Setting-up the INTEGER registers
     ir_i_debug_register = 1
@@ -136,6 +135,46 @@ BEGIN
     SET_PREG_CMT (pr_o_object_position, 'Vision coordinates', i_status)
 END registers_setup
 
+------------------------------------ Getting the command from the integer value  -----------------------------------
+ROUTINE get_command(i_command:INTEGER, s_command:STRING)
+BEGIN
+    IF ((i_command > 0) AND (i_command < 7)) THEN
+
+        IF  i_command = 1 THEN
+                s_command = 'start_vision'
+            ENDIF
+            
+            IF  i_command = 2 THEN
+                s_command = 'stop_vision'
+            ENDIF
+            
+            IF  i_command = 3 THEN
+                s_command = 'locate'
+            ENDIF
+            
+            IF  i_command = 4 THEN
+                s_command = 'get_recipe'
+            ENDIF
+            
+            IF  i_command = 5 THEN
+                GET_STR_REG(sr_io_recipe, s_recipe, i_status) -- Getting the recipe name to load
+                s_command = 'set_Recipe = ' + s_recipe -- String concatenetion
+            ENDIF
+            
+            IF  i_command = 6 THEN
+                s_command = 'state'
+            ENDIF
+            
+            IF  i_command = 7 THEN
+                GET_STR_REG(sr_i_custom_command, s_custom_command, i_status) -- Getting the custom command to execute
+                s_command = s_custom_command -- Formatting the command
+            ENDIF
+
+    ELSE
+        i_command = -1
+    ENDIF
+END get_command
+
 ------------------------------------ MAIN ------------------------------------
 BEGIN
     registers_setup(i_status)
@@ -168,4 +207,16 @@ BEGIN
     ENDIF
     SET_INT_REG (ir_io_exe_register, 0, i_status) -- Connection ok feed back
     
+    -- Main cicle
+     WHILE TRUE DO -- Looping until the socket file is open
+        -- Waiting for the execute command
+        REPEAT
+            GET_REG(ir_io_exe_register, b_real_flag, i_exe_flag, r_value, i_status)    
+            DELAY(50)       
+        UNTIL ((i_exe_flag = 0) OR (i_exe_flag = -1)) -- Case "No exe" or "Error"
+
+        GET_REG(ir_i_command_register, b_real_flag, i_command, r_value, i_status) -- Getting the command to send to the FlexiBowl
+        get_command(i_command, s_command)
+
+    ENDWHILE
 END TCP_Client
