@@ -39,7 +39,7 @@ def locate(): # Randomizing the values of an object to simulate a vision system
         message = (f"Object_{n};{x};{y};{rz};", 1)
         debug(message[0])
     else:
-        message = ("#Error : Camera ran into an error!", -2)
+        message = ("#Error : Camera in error!", -2)
         error_log("Camera ran into an error!")
         
     return message
@@ -98,7 +98,7 @@ def get_response(msg:str) -> Tuple[str, int]:
             return set_recipe(recipe)
         except ValueError:
             error_log("Invalid format for set_recipe (use set_recipe=name)")
-            return ("#Error: Invalid format for set_recipe (use set_recipe=name)", 1)
+            return ("#Error: Invalid command format", 1)
             
     return DISPATCHER.get(msg, lambda: default(msg))() # Executing the command if it's in the dispatcher otherwise executing the default command
 
@@ -122,8 +122,8 @@ def start_server():
                     data = conn.recv(1024) # Waiting for a string from the robot
                     
                     if  not data:
-                        error_log("no data received")
-                        response_msg = "#Error: no data received"
+                        error_log("No data received")
+                        response_msg = "#Error: No data received"
                     else:    
                         msg = data.decode()
                         normalized_msg = ''.join(msg.lower().split()) # Making the server not case_sensitive to avoid errors
@@ -131,10 +131,10 @@ def start_server():
                         
                         if vision_system_state == -1 and normalized_msg != "start_vision":
                             error_log("The vision system is off")
-                            response_msg = "#Error: The vision system is off"   
+                            response_msg = "#Error: Vision system is off"   
                         elif vision_system_state == -2 and normalized_msg != "end_vision":
                             error_log("The vision system ran into an error, Please turn the camera off and then back on")
-                            response_msg = "#Error: The vision system ran into an error, Please turn the camera off and then back on"
+                            response_msg = "#Error: Vision system error"
                         else:
                             command = get_response(normalized_msg)                    
                             response_msg = command[0]
@@ -158,5 +158,5 @@ if __name__ == "__main__":
     while restart_flag == -1: 
         # This loop restarts the server if a disconnection occurs
         restart_flag = start_server()
-        debug("DEBUG: Restarting the server")
+        debug("Restarting the server")
         time.sleep(3) # Sleeping for 3 seconds before restart
