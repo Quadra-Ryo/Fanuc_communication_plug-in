@@ -2,7 +2,7 @@ PROGRAM TCP_Client
 
 ------------------------------------ TCP_Client Plug-In ------------------------------------
 -- Author: Niccolo' Quadrani
--- Date: 6/05/2025
+-- Date: 9/05/2025
 -- Version: 1.0.0
 ------------------------------------ TCP_Client Plug-In ------------------------------------
 
@@ -53,6 +53,7 @@ VAR
     s_recipe:                       STRING [32]
     s_response:                     STRING [32]
     s_error:                        STRING [32]
+    s_command:                      STRING [32]
 
     -- Integer Registers
     ir_i_debug_register:            INTEGER
@@ -90,7 +91,7 @@ BEGIN
 END debug
 
 ------------------------------------ Registers Set-Up ------------------------------------
-ROUTINE registers_setup(s_status:INTEGER)
+ROUTINE registers_setup(i_status:INTEGER)
 BEGIN
     -- Setting-up the INTEGER registers
     ir_i_debug_register = 1
@@ -136,9 +137,9 @@ BEGIN
 END registers_setup
 
 ------------------------------------ Getting the command from the integer value  -----------------------------------
-ROUTINE get_command(i_command:INTEGER, s_command:STRING)
+ROUTINE get_command(i_command:INTEGER)
 BEGIN
-    IF ((i_command > 0) AND (i_command < 7)) THEN
+    IF ((i_command > 0) AND (i_command < 8)) THEN
 
         IF  i_command = 1 THEN
                 s_command = 'start_vision'
@@ -158,7 +159,7 @@ BEGIN
             
             IF  i_command = 5 THEN
                 GET_STR_REG(sr_io_recipe, s_recipe, i_status) -- Getting the recipe name to load
-                s_command = 'set_Recipe = ' + s_recipe -- String concatenetion
+                s_command = 'set_Recipe = ' + s_recipe -- String concatenation
             ENDIF
             
             IF  i_command = 6 THEN
@@ -171,31 +172,29 @@ BEGIN
             ENDIF
 
     ELSE
-        i_command = -1
+        i_command = -1 -- Command selected error
     ENDIF
 END get_command
 
------------------------------------- MAIN ------------------------------------
+------------------------------------ Getting the command from the integer value  -----------------------------------
+ROUTINE connection_init (client:STRING)
 BEGIN
-    registers_setup(i_status)
-    debug('Registers setted-up')
-
     -- Connecting to the client before doing any client related operation
-    MSG_CONNECT('C3:',i_status)
+    MSG_CONNECT(client,i_status)
     WHILE i_status <> 0 DO
         CLR_IO_STAT(f_socket) -- Clearing the IO status from older runs
-        MSG_DISCO('C3:',i_status) -- Clearing the socket connection
+        MSG_DISCO(client,i_status) -- Clearing the socket connection
         DELAY(100)
-        MSG_CONNECT('C3:',i_status)
+        MSG_CONNECT(client,i_status)
     ENDWHILE
     
-    OPEN FILE f_socket ('rw','C3:') -- Opening the file using write mode on client 3 
+    OPEN FILE f_socket ('rw',client) -- Opening the file using write mode on client 3 
     i_status = IO_STATUS(f_socket) -- Checking the current IO i_status
 
     WHILE i_status <> 0 DO -- Looping until the socket file is open
         CLOSE FILE f_socket -- Closing the file to reset the connection
         DELAY(50) -- Waiting for the connection to be established
-        OPEN FILE f_socket ('rw','C3:') -- Opening the file using write mode on client 3
+        OPEN FILE f_socket ('rw',client) -- Opening the file using write mode on client 3
         DELAY(25)
         i_status = IO_STATUS(f_socket) -- Checking the current IO i_status
     ENDWHILE
@@ -206,17 +205,50 @@ BEGIN
         READ f_socket (s_received_string::i_bytes_to_read)
     ENDIF
     SET_INT_REG (ir_io_exe_register, 0, i_status) -- Connection ok feed back
-    
+END connection_init
+
+------------------------------------ MAIN ------------------------------------
+BEGIN
+    registers_setup(i_status)
+    debug('Registers setted-up')
+    connection_init('C3:') -- Client used in the comunication
+
     -- Main cicle
      WHILE TRUE DO -- Looping until the socket file is open
         -- Waiting for the execute command
         REPEAT
-            GET_REG(ir_io_exe_register, b_real_flag, i_exe_flag, r_value, i_status)    
+            GET_REG(ir_io_exe_register, b_real_flag, i_exe_flag, r_value, i_status) -- Getting the execution register value
             DELAY(50)       
         UNTIL ((i_exe_flag = 0) OR (i_exe_flag = -1)) -- Case "No exe" or "Error"
 
         GET_REG(ir_i_command_register, b_real_flag, i_command, r_value, i_status) -- Getting the command to send to the FlexiBowl
-        get_command(i_command, s_command)
+        
+        get_command(i_command)
 
+        IF i_command = -1 THEN 
+            debug('The selected command does not exist, please choose a command between 1 and 7')
+            GO TO skip_iteration -- Like a continue in the loop, jumping to the skip_iteration lable
+        ENDIF
+        
+        WRITE f_socket(s_command) -- Sending the command to the vision server using the file socket
+        SET_INT_REG (ir_i_command_register, 0, i_status) -- Setting the command register to 0 to reset it
+        
+        -- Reading the response from the vision server
+        REPEAT
+            BYTES_AHEAD(f_flexivision_socket,i_bytes_to_read,i_status)
+            DELAY(50)
+        UNTIL (i_bytes_to_read <= 0)
+
+        IF i_command = 3 THEN
+            -- Splitting the coordinates
+
+        ELSE
+            -- Setting string registers
+
+        ENDIF
+
+        debug('Command selected: "' + s_command + '"')
+        
+        skip_iteration:: -- Continue lable
     ENDWHILE
 END TCP_Client
