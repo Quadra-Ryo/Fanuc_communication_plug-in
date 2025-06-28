@@ -39,6 +39,7 @@ VAR
     i_object_number:                INTEGER
     i_status:                       INTEGER
     i_bytes_to_read:                INTEGER
+    i_error:                        INTEGER
 
     -- Real Variables
     r_value:                        REAL
@@ -221,12 +222,14 @@ BEGIN
             DELAY(50)       
         UNTIL ((i_exe_flag = 0) OR (i_exe_flag = -1)) -- Case "No exe" or "Error"
 
-        GET_REG(ir_i_command_register, b_real_flag, i_command, r_value, i_status) -- Getting the command to send to the FlexiBowl
+        GET_REG(ir_i_command_register, b_real_flag, i_command, r_value, i_status) -- Getting the command to send to the vision server
         
         get_command(i_command)
 
         IF i_command = -1 THEN 
             debug('The selected command does not exist, please choose a command between 1 and 7')
+            SET_STR_REG (sr_o_error, 'No valid command', i_status)
+            SET_INT_REG (ir_io_exe_register, -1, i_status)
             GO TO skip_iteration -- Like a continue in the loop, jumping to the skip_iteration lable
         ENDIF
         
@@ -235,20 +238,35 @@ BEGIN
         
         -- Reading the response from the vision server
         REPEAT
-            BYTES_AHEAD(f_flexivision_socket,i_bytes_to_read,i_status)
+            BYTES_AHEAD(f_socket ,i_bytes_to_read,i_status)
             DELAY(50)
         UNTIL (i_bytes_to_read <= 0)
 
+        READ f_socket (s_received_string::i_bytes_to_read) -- Reading the response
+        
         IF i_command = 3 THEN
             -- Splitting the coordinates
 
         ELSE
-            -- Setting string registers
-
+            i_error = INDEX(s_received_string, '#') -- Checking if the char "#" is present in the string to launch an error
+            
+            IF i_error <> 0 THEN
+                SET_STR_REG (sr_o_error, 'Error from the vision server', i_status) -- Writing the error in the error register
+                SET_INT_REG (ir_io_execute_register, -1, i_status) -- Writing the error ack in the register
+                debug(s_received_string) -- Printing the error string
+                GO TO skip_iteration -- Skipping the iteration
+            ELSE
+                -- Setting string registers
+                debug(s_received_string)
+                SET_STR_REG (sr_o_response, s_received_string, i_status)
+            ENDIF
         ENDIF
-
-        debug('Command selected: "' + s_command + '"')
         
+        SET_INT_REG (ir_io_exe_register, 0, i_status) -- Command ended
+        SET_STR_REG (sr_o_error, '', i_status) -- Resetting the error
+        i_bytes_to_read = 0
+        s_received_string = ''
+
         skip_iteration:: -- Continue lable
     ENDWHILE
 END TCP_Client
